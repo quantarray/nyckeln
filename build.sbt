@@ -1,0 +1,119 @@
+import sbt.Keys._
+import sbt._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport._
+
+val compilerVersion = "2.12.2"
+
+val breezeVersion = "0.13.1"
+val scalacticVersion = "3.0.3"
+val scalatestVersion = "3.0.3"
+
+lazy val commonSettings = Seq(
+  organization := "com.quantarray",
+
+  version := (version in ThisBuild).value,
+
+  scalaVersion := compilerVersion,
+
+  scalacOptions in ThisBuild ++= Seq("-unchecked", "-deprecation", "-feature"),
+
+  // Due to this flag value "true" test cases fail in sbt, need to find alternative way.
+  packageOptions in(Compile, packageBin) += Package.ManifestAttributes(java.util.jar.Attributes.Name.SEALED -> "false"),
+
+  unmanagedBase := baseDirectory.value / ".." / "lib",
+
+  updateOptions := updateOptions.value.withCachedResolution(true),
+
+  logBuffered := false,
+
+  parallelExecution in Test := false,
+
+  useGpg := true,
+
+  usePgpKeyHex("389FB928"),
+
+  credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+
+  publishTo <<= version
+  { v: String =>
+    val nexus = "https://oss.sonatype.org/"
+    if (v.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus + "content/repositories/snapshots")
+    else Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  },
+
+  publishMavenStyle := true,
+
+  publishArtifact in Test := false,
+
+  pomIncludeRepository :=
+    { x => false },
+
+  pomExtra := <url>http://nyckeln.io/</url>
+    <licenses>
+      <license>
+        <name>Apache License, Version 2.0</name>
+        <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        <distribution>repo</distribution>
+      </license>
+    </licenses>
+    <scm>
+      <url>git@github.com:quantarray/nyckeln.git</url>
+      <connection>scm:git:git@github.com:quantarray/nyckeln.git</connection>
+    </scm>
+    <developers>
+      <developer>
+        <id>araik</id>
+        <name>Araik Grigoryan</name>
+        <url>http://www.quantarray.com</url>
+      </developer>
+    </developers>
+)
+
+lazy val `nyckeln-learning` = (project in file("nyckeln-learning")).
+  settings(commonSettings: _*).
+  settings(
+    name := "nyckeln-learning",
+    libraryDependencies ++= Seq(
+      "org.scalanlp" %% "breeze" % breezeVersion,
+      "org.scalatest" %% "scalatest" % scalatestVersion % "test"
+    )
+  )
+
+lazy val `nyckeln-learning-neural` = (project in file("nyckeln-learning-neural")).
+  settings(commonSettings: _*).
+  settings(
+    name := "nyckeln-learning-neural",
+    libraryDependencies ++= Seq(
+      "org.scalanlp" %% "breeze" % breezeVersion,
+      "org.scalanlp" %% "breeze-natives" % breezeVersion,
+      "org.scalatest" %% "scalatest" % scalatestVersion % "test"
+    )
+  ).dependsOn(`nyckeln-learning`)
+
+lazy val nyckeln = (project in file(".")).
+  settings(commonSettings: _*).
+  settings(
+    name := "nyckeln",
+    testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-nyckeln")).
+  aggregate(
+    `nyckeln-learning`, `nyckeln-learning-neural`
+  ).enablePlugins(OrnatePlugin)
+
+releaseTagComment := s"Release ${(version in ThisBuild).value}."
+
+releaseCommitMessage := s"Move to version to ${(version in ThisBuild).value}."
+
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  setNextVersion,
+  commitNextVersion,
+  pushChanges
+)
