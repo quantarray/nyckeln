@@ -19,6 +19,8 @@
 
 package com.quantarray.nyckeln.learning.neural
 
+import scala.collection.immutable
+
 /**
  * Nucleus. A compact collection of neurons forming a layer inside a net.
  *
@@ -28,7 +30,7 @@ case class Nucleus(index: LayerIndex, activation: Activation, numberOfNeurons: I
 {
   type C = Neuron
 
-  lazy val cells = (1 to numberOfNeurons).map(Neuron(_, this))
+  lazy val cells: immutable.IndexedSeq[Neuron] = (1 to numberOfNeurons).map(Neuron(_, this))
 
   override def toString: String = s"layer $index"
 }
